@@ -1,7 +1,7 @@
 ** avrUART
 This is a compact code-size C++17 header-only implementation of a half-duplex software UART solution. It is designed to handle speeds greater than or equal to 8 CPU cycles per bit, which means, for example, 1 Mbps @ 8 MHz. The data frame configuration supported is 8-N-1, with 8 bits of data, no parity, and 1 stop bit. The implementation is based on the [[file:application_note/avr305.pdf][AVR305]] application note, and inline assembly is used to guarantee the precise time-sensitive code needed for implementing an UART software solution. The C++ layer is just a stub for the assembly implementation. The only dependency is [[https://github.com/ricardocosme/avrIO][avrIO]], which is used to receive the ~Tx~ and ~Rx~ pins as arguments, and the application program must be compiled with ~-Os~ optimization.
 
-*** Echo [demo] ~106 bytes @ ATtiny13A using avr-g++ 13.2.0 with -Os~
+*** Echo [demo]
 #+BEGIN_SRC C++
   #include <avr/uart.hpp>
 
@@ -17,9 +17,11 @@ This is a compact code-size C++17 header-only implementation of a half-duplex so
 
 Receives 1 byte through the ~Pb1~ pin (~Rx~) and echoes it through the ~Pb0~ pin (~Tx~). Transmission and reception operates at a baud rate of 38,400 bps, and the AVR is operating with a CPU frequency of 1 MHz.
 
+~106 bytes @ ATtiny13A using avr-g++ 13.2.0 with -Os~
+
 *** How to use it
 This is a header-only library, so nothing needs to be compiled:
-1. Check the [[#dependencies][requirements and dependencies]] section.
+1. Check the requirements and dependencies section.
 2. Add the ~include~ directory to your include path, as well as the
    path to include directory related to [[https://github.com/ricardocosme/avrIO][avrIO]].
 3. Choose a baud rate and a clock frequency. Keep in mind that the
@@ -35,9 +37,6 @@ This is a header-only library, so nothing needs to be compiled:
    your source.
 
 *** Requirements and dependencies
-:PROPERTIES:
-:CUSTOM_ID: dependencies
-:END:
 1. ~avr-gcc~ with ~-std=c++17~ and ~-Os~.
 2. The header-only llibrary [[https://github.com/ricardocosme/avrIO][avrIO]] to define ~Tx~ and ~Rx~ pins.
 
@@ -47,15 +46,15 @@ This is a header-only library, so nothing needs to be compiled:
 *** Tests
 Tested with the following pairs of baud rate and CPU clock frequency using ATtiny13A or ATtiny85 with a calibrated RC oscillator:
 
-1 Mbps @ 8 MHz [test again]
-921.6 kbps @ 8 MHz [test again]
-500.0 kbps @ 8 MHz
-230.4 kbps @ 8 MHz
-115.2 kbps @ 8 MHz
-57,600 bps @ 1 Mhz
-38,400 bps @ 1 MHz
-19,200 bps @ 1 MHz
-9,600 bps @ 1MHz
+* 1 Mbps @ 8 MHz [test again]
+* 921.6 kbps @ 8 MHz [test again]
+* 500.0 kbps @ 8 MHz
+* 230.4 kbps @ 8 MHz
+* 115.2 kbps @ 8 MHz
+* 57,600 bps @ 1 Mhz
+* 38,400 bps @ 1 MHz
+* 19,200 bps @ 1 MHz
+* 9,600 bps @ 1MHz
 
 *** ToDo
 - [ ] Implement a set of methods to read sequences of bytes.
@@ -63,4 +62,4 @@ Tested with the following pairs of baud rate and CPU clock frequency using ATtin
 - [ ] Increase the upper limit of CPU cycles supported. The current implementation only supports ~513 cycles~.
    
 *** License
-avrUART is released under [[https://opensource.org/licenses/MIT][MIT License]].
+avrUART is released under [[file:LICENSE][MIT License]].
