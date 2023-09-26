@@ -1,0 +1,9 @@
+demo/*.s
+demo/*.lst
+demo/*.elf
+test/*.s
+test/*.lst
+test/*.elf
+test/pc_rx_48bytes_tx_1byte
+test/pc_rx_48bytes
+helper/clk-freq_baud-rate
