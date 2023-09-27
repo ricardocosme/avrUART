@@ -18,8 +18,6 @@ void print(uint8_t byte)
 { std::cout << std::format("{:#04x} ", byte) << std::flush; }
 
 #define BPS B921600
-// #define BPS B576000
-// #define BPS B460800
 
 int main() {
   struct termios settings{};

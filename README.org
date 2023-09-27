@@ -46,8 +46,9 @@ This is a header-only library, so nothing needs to be compiled:
 *** Tests
 Tested with the following pairs of baud rate and CPU clock frequency using ATtiny13A or ATtiny85 with a calibrated RC oscillator:
 
-- 1 Mbps @ 8 MHz [test again]
-- 921.6 kbps @ 8 MHz [test again]
+- 1 Mbps @ 8 MHz 
+- 921.6 kbps @ 8 MHz 
+- 576.0 kbps @ 8 MHz
 - 500.0 kbps @ 8 MHz
 - 230.4 kbps @ 8 MHz
 - 115.2 kbps @ 8 MHz

@@ -24,11 +24,9 @@ void print(uint8_t byte)
 // #define  BPS B115200
 // #define  BPS B230400
 // #define  BPS B460800
-#define  BPS B500000
-// #define  BPS B576000
+// #define  BPS B500000
+#define  BPS B576000
 // #define  BPS B921600
-
-
 
 int main() {
   struct termios settings{};
