@@ -47,9 +47,9 @@ This is a header-only library, so nothing needs to be compiled:
 Tested with the following pairs of baud rate and CPU clock frequency using ATtiny13A or ATtiny85 with a calibrated RC oscillator:
 
 - 1 Mbps @ 8 MHz 
-- 921.6 kbps @ 8 MHz 
+- 921.6 kbps @ 8 MHz [*]
 - 576.0 kbps @ 8 MHz
-- 500.0 kbps @ 8 MHz
+- 500.0 kbps @ 8 MHz, 8.5 MHz
 - 230.4 kbps @ 8 MHz
 - 115.2 kbps @ 8 MHz
 - 57,600 bps @ 1 Mhz
@@ -57,8 +57,10 @@ Tested with the following pairs of baud rate and CPU clock frequency using ATtin
 - 19,200 bps @ 1 MHz
 - 9,600 bps @ 1MHz
 
+[*] This isn't a good pair, and it was tested only to transmit data to support tests for 1 Mbps @ 8 MHz.
+  
 *** ToDo
-- [ ] Implement a set of methods to read sequences of bytes.
+- [X] Implement a set of methods to read sequences of bytes.
 - [ ] Implement an asynchronous read solution.
 - [ ] Increase the upper limit of CPU cycles supported. The current implementation only supports ~513 cycles~.
    

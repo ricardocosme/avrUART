@@ -102,11 +102,11 @@ struct soft {
   static constexpr auto cycles_required{
     detail::math::round(bit_length_cycles(clk, bitrate))};
 
-  static_assert(bit_length_cycles(clk, bitrate) >= 8,
+  static_assert(cycles_required >= 8,
     "the bit length in cycles must be greater or equal to 8. "\
     "[clk_frequency/baud_rate >= 8]");
   
-  static_assert(bit_length_cycles(clk, bitrate) <= 513,
+  static_assert(cycles_required <= 513,
     "the bit length in cycles must be less than or equal to 513. "\
     "[clk_frequency/baud_rate <= 513]");
   
@@ -276,6 +276,421 @@ struct soft {
       }
     }
     return byte;
+  }
+
+  /** buffer to store N received bytes
+
+      This abstraction is used by get<N>() to return the received
+      bytes.
+   */
+  template<uint8_t N>
+  class buffer_t {
+    uint8_t _data[N];
+  public:
+    static constexpr uint8_t size{N};
+    
+    using iterator = uint8_t*;
+    using const_iterator = const uint8_t*;
+
+    iterator begin() { return _data; }
+    const_iterator begin() const { return _data; }
+    const_iterator cbegin() const { return _data; }
+    iterator end() { return _data + size; }
+    const_iterator end() const { return _data + size; }
+    const_iterator cend() const { return _data + size; }
+    uint8_t& operator[](uint8_t i) { return _data[i]; }
+    const uint8_t& operator[](uint8_t i) const { return _data[i]; }
+    uint8_t* data() { return _data; }
+    const uint8_t* data() const { return _data; }
+  };
+
+  /** Receive and return N bytes from Rx. This is a blocking call.
+
+      Note: this methods can't handle the high speeds handled by the
+      method that receives just one byte. We can handle 1 Mbps @ 8 MHz
+      using get() but with this version we can only handle
+      communication using 16 CPU cycles as a bit time, so it's for
+      example 500 kbps @ 8 MHz.
+   */
+  template<uint8_t N>
+  auto get() const {    
+    static_assert(cycles_required >= 16,
+                  "the bit length in cycles must be greater or equal to 16. "\
+                  "[clk_frequency/baud_rate >= 16]");
+    
+    buffer_t<N> buffer;
+    uint8_t* pvalues = buffer.data();
+    uint8_t cnt;
+    
+    /** loop instructions executed in 8 cycles */
+    constexpr auto delay{cycles_required - 8};
+
+    /** 4(or 3) cycles of instructions before reaching the point of
+     * reading the bit. */
+    constexpr auto one_half_delay
+      {detail::math::round(1.5 * bit_length_cycles(clk, bitrate) - 4)};
+
+    constexpr auto one_half_delay_after_fst_bit
+      {detail::math::round(1.5 * bit_length_cycles(clk, bitrate) - 10)};
+    
+    uint8_t byte{0}, bits,
+      delay_cnt, delay_b{delay / 3},
+      one_half_delay_cnt, one_half_delay_b{one_half_delay / 3},
+      one_half_delay_after_fst_bit_b{one_half_delay_after_fst_bit / 3};
+    
+    if constexpr (delay % 3 == 0 && one_half_delay % 3 == 0 && one_half_delay_after_fst_bit % 3 == 0) {
+      asm volatile(
+        AVR_UART_GET_SEQ_ASM_TMPL(
+          "",
+          AVR_UART_DELAY_3_CYCLE,
+          "",
+          AVR_UART_DELAY_3_CYCLE_GET_SEQ,
+          "")
+        AVR_UART_GET_OUT_OPS(AVR_UART_OUT_OPS_DELAY)
+        AVR_UART_GET_SEQ_OUT_OPS
+        AVR_UART_GET_IN_OPS(AVR_UART_IN_OPS_DELAY)
+        AVR_UART_GET_SEQ_IN_OPS
+        );
+    } else if constexpr (delay % 3 == 0 && one_half_delay % 3 == 0 && one_half_delay_after_fst_bit % 3 == 1) {
+      asm volatile(
+        AVR_UART_GET_SEQ_ASM_TMPL(
+          "",
+          AVR_UART_DELAY_3_CYCLE,
+          "",
+          AVR_UART_DELAY_3_CYCLE_GET_SEQ,
+          AVR_UART_DELAY_1_CYCLE)
+        AVR_UART_GET_OUT_OPS(AVR_UART_OUT_OPS_DELAY)
+        AVR_UART_GET_SEQ_OUT_OPS
+        AVR_UART_GET_IN_OPS(AVR_UART_IN_OPS_DELAY)
+        AVR_UART_GET_SEQ_IN_OPS
+        );
+    } else if constexpr (delay % 3 == 0 && one_half_delay % 3 == 0 && one_half_delay_after_fst_bit % 3 == 2) {
+      asm volatile(
+        AVR_UART_GET_SEQ_ASM_TMPL(
+          "",
+          AVR_UART_DELAY_3_CYCLE,
+          "",
+          AVR_UART_DELAY_3_CYCLE_GET_SEQ,
+          AVR_UART_DELAY_2_CYCLE)
+        AVR_UART_GET_OUT_OPS(AVR_UART_OUT_OPS_DELAY)
+        AVR_UART_GET_SEQ_OUT_OPS
+        AVR_UART_GET_IN_OPS(AVR_UART_IN_OPS_DELAY)
+        AVR_UART_GET_SEQ_IN_OPS
+        );
+    } else if constexpr (delay % 3 == 0 && one_half_delay % 3 == 1 && one_half_delay_after_fst_bit % 3 == 0) {
+      asm volatile(
+        AVR_UART_GET_SEQ_ASM_TMPL(
+          AVR_UART_DELAY_1_CYCLE,
+          AVR_UART_DELAY_3_CYCLE,
+          "",
+          AVR_UART_DELAY_3_CYCLE_GET_SEQ,
+          "")
+        AVR_UART_GET_OUT_OPS(AVR_UART_OUT_OPS_DELAY)
+        AVR_UART_GET_SEQ_OUT_OPS
+        AVR_UART_GET_IN_OPS(AVR_UART_IN_OPS_DELAY)
+        AVR_UART_GET_SEQ_IN_OPS
+        );
+    } else if constexpr (delay % 3 == 0 && one_half_delay % 3 == 1 && one_half_delay_after_fst_bit % 3 == 1) {
+      asm volatile(
+        AVR_UART_GET_SEQ_ASM_TMPL(
+          AVR_UART_DELAY_1_CYCLE,
+          AVR_UART_DELAY_3_CYCLE,
+          "",
+          AVR_UART_DELAY_3_CYCLE_GET_SEQ,
+          AVR_UART_DELAY_1_CYCLE)
+        AVR_UART_GET_OUT_OPS(AVR_UART_OUT_OPS_DELAY)
+        AVR_UART_GET_SEQ_OUT_OPS
+        AVR_UART_GET_IN_OPS(AVR_UART_IN_OPS_DELAY)
+        AVR_UART_GET_SEQ_IN_OPS
+        );
+    } else if constexpr (delay % 3 == 0 && one_half_delay % 3 == 1 && one_half_delay_after_fst_bit % 3 == 2) {
+      asm volatile(
+        AVR_UART_GET_SEQ_ASM_TMPL(
+          AVR_UART_DELAY_1_CYCLE,
+          AVR_UART_DELAY_3_CYCLE,
+          "",
+          AVR_UART_DELAY_3_CYCLE_GET_SEQ,
+          AVR_UART_DELAY_2_CYCLE)
+        AVR_UART_GET_OUT_OPS(AVR_UART_OUT_OPS_DELAY)
+        AVR_UART_GET_SEQ_OUT_OPS
+        AVR_UART_GET_IN_OPS(AVR_UART_IN_OPS_DELAY)
+        AVR_UART_GET_SEQ_IN_OPS
+        );
+    } else if constexpr (delay % 3 == 0 && one_half_delay % 3 == 2 && one_half_delay_after_fst_bit % 3 == 0) {
+      asm volatile(
+        AVR_UART_GET_SEQ_ASM_TMPL(
+          AVR_UART_DELAY_2_CYCLE,
+          AVR_UART_DELAY_3_CYCLE,
+          "",
+          AVR_UART_DELAY_3_CYCLE_GET_SEQ,
+          "")
+        AVR_UART_GET_OUT_OPS(AVR_UART_OUT_OPS_DELAY)
+        AVR_UART_GET_SEQ_OUT_OPS
+        AVR_UART_GET_IN_OPS(AVR_UART_IN_OPS_DELAY)
+        AVR_UART_GET_SEQ_IN_OPS
+        );
+    } else if constexpr (delay % 3 == 0 && one_half_delay % 3 == 2 && one_half_delay_after_fst_bit % 3 == 1) {
+      asm volatile(
+        AVR_UART_GET_SEQ_ASM_TMPL(
+          AVR_UART_DELAY_2_CYCLE,
+          AVR_UART_DELAY_3_CYCLE,
+          "",
+          AVR_UART_DELAY_3_CYCLE_GET_SEQ,
+          AVR_UART_DELAY_1_CYCLE)
+        AVR_UART_GET_OUT_OPS(AVR_UART_OUT_OPS_DELAY)
+        AVR_UART_GET_SEQ_OUT_OPS
+        AVR_UART_GET_IN_OPS(AVR_UART_IN_OPS_DELAY)
+        AVR_UART_GET_SEQ_IN_OPS
+        );
+    } else if constexpr (delay % 3 == 0 && one_half_delay % 3 == 2 && one_half_delay_after_fst_bit % 3 == 2) {
+      asm volatile(
+        AVR_UART_GET_SEQ_ASM_TMPL(
+          AVR_UART_DELAY_2_CYCLE,
+          AVR_UART_DELAY_3_CYCLE,
+          "",
+          AVR_UART_DELAY_3_CYCLE_GET_SEQ,
+          AVR_UART_DELAY_2_CYCLE)
+        AVR_UART_GET_OUT_OPS(AVR_UART_OUT_OPS_DELAY)
+        AVR_UART_GET_SEQ_OUT_OPS
+        AVR_UART_GET_IN_OPS(AVR_UART_IN_OPS_DELAY)
+        AVR_UART_GET_SEQ_IN_OPS
+        );
+    } else if constexpr (delay % 3 == 1 && one_half_delay % 3 == 0 && one_half_delay_after_fst_bit % 3 == 0) {
+      asm volatile(
+        AVR_UART_GET_SEQ_ASM_TMPL(
+          "",
+          AVR_UART_DELAY_3_CYCLE,
+          AVR_UART_DELAY_1_CYCLE,
+          AVR_UART_DELAY_3_CYCLE_GET_SEQ,
+          "")
+        AVR_UART_GET_OUT_OPS(AVR_UART_OUT_OPS_DELAY)
+        AVR_UART_GET_SEQ_OUT_OPS
+        AVR_UART_GET_IN_OPS(AVR_UART_IN_OPS_DELAY)
+        AVR_UART_GET_SEQ_IN_OPS
+        );
+    } else if constexpr (delay % 3 == 1 && one_half_delay % 3 == 0 && one_half_delay_after_fst_bit % 3 == 1) {
+      asm volatile(
+        AVR_UART_GET_SEQ_ASM_TMPL(
+          "",
+          AVR_UART_DELAY_3_CYCLE,
+          AVR_UART_DELAY_1_CYCLE,
+          AVR_UART_DELAY_3_CYCLE_GET_SEQ,
+          AVR_UART_DELAY_1_CYCLE)
+        AVR_UART_GET_OUT_OPS(AVR_UART_OUT_OPS_DELAY)
+        AVR_UART_GET_SEQ_OUT_OPS
+        AVR_UART_GET_IN_OPS(AVR_UART_IN_OPS_DELAY)
+        AVR_UART_GET_SEQ_IN_OPS
+        );
+    } else if constexpr (delay % 3 == 1 && one_half_delay % 3 == 0 && one_half_delay_after_fst_bit % 3 == 2) {
+      asm volatile(
+        AVR_UART_GET_SEQ_ASM_TMPL(
+          "",
+          AVR_UART_DELAY_3_CYCLE,
+          AVR_UART_DELAY_1_CYCLE,
+          AVR_UART_DELAY_3_CYCLE_GET_SEQ,
+          AVR_UART_DELAY_2_CYCLE)
+        AVR_UART_GET_OUT_OPS(AVR_UART_OUT_OPS_DELAY)
+        AVR_UART_GET_SEQ_OUT_OPS
+        AVR_UART_GET_IN_OPS(AVR_UART_IN_OPS_DELAY)
+        AVR_UART_GET_SEQ_IN_OPS
+        );
+    } else if constexpr (delay % 3 == 1 && one_half_delay % 3 == 1 && one_half_delay_after_fst_bit % 3 == 0) {
+      asm volatile(
+        AVR_UART_GET_SEQ_ASM_TMPL(
+          AVR_UART_DELAY_1_CYCLE,
+          AVR_UART_DELAY_3_CYCLE,
+          AVR_UART_DELAY_1_CYCLE,
+          AVR_UART_DELAY_3_CYCLE_GET_SEQ,
+          "")
+        AVR_UART_GET_OUT_OPS(AVR_UART_OUT_OPS_DELAY)
+        AVR_UART_GET_SEQ_OUT_OPS
+        AVR_UART_GET_IN_OPS(AVR_UART_IN_OPS_DELAY)
+        AVR_UART_GET_SEQ_IN_OPS
+        );
+    } else if constexpr (delay % 3 == 1 && one_half_delay % 3 == 1 && one_half_delay_after_fst_bit % 3 == 1) {
+      asm volatile(
+        AVR_UART_GET_SEQ_ASM_TMPL(
+          AVR_UART_DELAY_1_CYCLE,
+          AVR_UART_DELAY_3_CYCLE,
+          AVR_UART_DELAY_1_CYCLE,
+          AVR_UART_DELAY_3_CYCLE_GET_SEQ,
+          AVR_UART_DELAY_1_CYCLE)
+        AVR_UART_GET_OUT_OPS(AVR_UART_OUT_OPS_DELAY)
+        AVR_UART_GET_SEQ_OUT_OPS
+        AVR_UART_GET_IN_OPS(AVR_UART_IN_OPS_DELAY)
+        AVR_UART_GET_SEQ_IN_OPS
+        );
+    } else if constexpr (delay % 3 == 1 && one_half_delay % 3 == 1 && one_half_delay_after_fst_bit % 3 == 2) {
+      asm volatile(
+        AVR_UART_GET_SEQ_ASM_TMPL(
+          AVR_UART_DELAY_1_CYCLE,
+          AVR_UART_DELAY_3_CYCLE,
+          AVR_UART_DELAY_1_CYCLE,
+          AVR_UART_DELAY_3_CYCLE_GET_SEQ,
+          AVR_UART_DELAY_2_CYCLE)
+        AVR_UART_GET_OUT_OPS(AVR_UART_OUT_OPS_DELAY)
+        AVR_UART_GET_SEQ_OUT_OPS
+        AVR_UART_GET_IN_OPS(AVR_UART_IN_OPS_DELAY)
+        AVR_UART_GET_SEQ_IN_OPS
+        );
+    } else if constexpr (delay % 3 == 1 && one_half_delay % 3 == 2 && one_half_delay_after_fst_bit % 3 == 0) {
+      asm volatile(
+        AVR_UART_GET_SEQ_ASM_TMPL(
+          AVR_UART_DELAY_2_CYCLE,
+          AVR_UART_DELAY_3_CYCLE,
+          AVR_UART_DELAY_1_CYCLE,
+          AVR_UART_DELAY_3_CYCLE_GET_SEQ,
+          "")
+        AVR_UART_GET_OUT_OPS(AVR_UART_OUT_OPS_DELAY)
+        AVR_UART_GET_SEQ_OUT_OPS
+        AVR_UART_GET_IN_OPS(AVR_UART_IN_OPS_DELAY)
+        AVR_UART_GET_SEQ_IN_OPS
+        );
+    } else if constexpr (delay % 3 == 1 && one_half_delay % 3 == 2 && one_half_delay_after_fst_bit % 3 == 1) {
+      asm volatile(
+        AVR_UART_GET_SEQ_ASM_TMPL(
+          AVR_UART_DELAY_2_CYCLE,
+          AVR_UART_DELAY_3_CYCLE,
+          AVR_UART_DELAY_1_CYCLE,
+          AVR_UART_DELAY_3_CYCLE_GET_SEQ,
+          AVR_UART_DELAY_1_CYCLE)
+        AVR_UART_GET_OUT_OPS(AVR_UART_OUT_OPS_DELAY)
+        AVR_UART_GET_SEQ_OUT_OPS
+        AVR_UART_GET_IN_OPS(AVR_UART_IN_OPS_DELAY)
+        AVR_UART_GET_SEQ_IN_OPS
+        );
+    } else if constexpr (delay % 3 == 1 && one_half_delay % 3 == 2 && one_half_delay_after_fst_bit % 3 == 1) {
+      asm volatile(
+        AVR_UART_GET_SEQ_ASM_TMPL(
+          AVR_UART_DELAY_2_CYCLE,
+          AVR_UART_DELAY_3_CYCLE,
+          AVR_UART_DELAY_1_CYCLE,
+          AVR_UART_DELAY_3_CYCLE_GET_SEQ,
+          AVR_UART_DELAY_2_CYCLE)
+        AVR_UART_GET_OUT_OPS(AVR_UART_OUT_OPS_DELAY)
+        AVR_UART_GET_SEQ_OUT_OPS
+        AVR_UART_GET_IN_OPS(AVR_UART_IN_OPS_DELAY)
+        AVR_UART_GET_SEQ_IN_OPS
+        );
+    } else if constexpr (delay % 3 == 2 && one_half_delay % 3 == 0 && one_half_delay_after_fst_bit % 3 == 0) {
+      asm volatile(
+        AVR_UART_GET_SEQ_ASM_TMPL(
+          "",
+          AVR_UART_DELAY_3_CYCLE,
+          AVR_UART_DELAY_2_CYCLE,
+          AVR_UART_DELAY_3_CYCLE_GET_SEQ,
+          "")
+        AVR_UART_GET_OUT_OPS(AVR_UART_OUT_OPS_DELAY)
+        AVR_UART_GET_SEQ_OUT_OPS
+        AVR_UART_GET_IN_OPS(AVR_UART_IN_OPS_DELAY)
+        AVR_UART_GET_SEQ_IN_OPS
+        );
+    } else if constexpr (delay % 3 == 2 && one_half_delay % 3 == 0 && one_half_delay_after_fst_bit % 3 == 1) {
+      asm volatile(
+        AVR_UART_GET_SEQ_ASM_TMPL(
+          "",
+          AVR_UART_DELAY_3_CYCLE,
+          AVR_UART_DELAY_2_CYCLE,
+          AVR_UART_DELAY_3_CYCLE_GET_SEQ,
+          AVR_UART_DELAY_1_CYCLE)
+        AVR_UART_GET_OUT_OPS(AVR_UART_OUT_OPS_DELAY)
+        AVR_UART_GET_SEQ_OUT_OPS
+        AVR_UART_GET_IN_OPS(AVR_UART_IN_OPS_DELAY)
+        AVR_UART_GET_SEQ_IN_OPS
+        );
+    } else if constexpr (delay % 3 == 2 && one_half_delay % 3 == 0 && one_half_delay_after_fst_bit % 3 == 2) {
+      asm volatile(
+        AVR_UART_GET_SEQ_ASM_TMPL(
+          "",
+          AVR_UART_DELAY_3_CYCLE,
+          AVR_UART_DELAY_2_CYCLE,
+          AVR_UART_DELAY_3_CYCLE_GET_SEQ,
+          AVR_UART_DELAY_2_CYCLE)
+        AVR_UART_GET_OUT_OPS(AVR_UART_OUT_OPS_DELAY)
+        AVR_UART_GET_SEQ_OUT_OPS
+        AVR_UART_GET_IN_OPS(AVR_UART_IN_OPS_DELAY)
+        AVR_UART_GET_SEQ_IN_OPS
+        );
+    } else if constexpr (delay % 3 == 2 && one_half_delay % 3 == 1 && one_half_delay_after_fst_bit % 3 == 0) {
+      asm volatile(
+        AVR_UART_GET_SEQ_ASM_TMPL(
+          AVR_UART_DELAY_1_CYCLE,
+          AVR_UART_DELAY_3_CYCLE,
+          AVR_UART_DELAY_2_CYCLE,
+          AVR_UART_DELAY_3_CYCLE_GET_SEQ,
+          "")
+        AVR_UART_GET_OUT_OPS(AVR_UART_OUT_OPS_DELAY)
+        AVR_UART_GET_SEQ_OUT_OPS
+        AVR_UART_GET_IN_OPS(AVR_UART_IN_OPS_DELAY)
+        AVR_UART_GET_SEQ_IN_OPS
+        );
+    } else if constexpr (delay % 3 == 2 && one_half_delay % 3 == 1 && one_half_delay_after_fst_bit % 3 == 1) {
+      asm volatile(
+        AVR_UART_GET_SEQ_ASM_TMPL(
+          AVR_UART_DELAY_1_CYCLE,
+          AVR_UART_DELAY_3_CYCLE,
+          AVR_UART_DELAY_2_CYCLE,
+          AVR_UART_DELAY_3_CYCLE_GET_SEQ,
+          AVR_UART_DELAY_1_CYCLE)
+        AVR_UART_GET_OUT_OPS(AVR_UART_OUT_OPS_DELAY)
+        AVR_UART_GET_SEQ_OUT_OPS
+        AVR_UART_GET_IN_OPS(AVR_UART_IN_OPS_DELAY)
+        AVR_UART_GET_SEQ_IN_OPS
+        );
+    } else if constexpr (delay % 3 == 2 && one_half_delay % 3 == 1 && one_half_delay_after_fst_bit % 3 == 2) {
+      asm volatile(
+        AVR_UART_GET_SEQ_ASM_TMPL(
+          AVR_UART_DELAY_1_CYCLE,
+          AVR_UART_DELAY_3_CYCLE,
+          AVR_UART_DELAY_2_CYCLE,
+          AVR_UART_DELAY_3_CYCLE_GET_SEQ,
+          AVR_UART_DELAY_2_CYCLE)
+        AVR_UART_GET_OUT_OPS(AVR_UART_OUT_OPS_DELAY)
+        AVR_UART_GET_SEQ_OUT_OPS
+        AVR_UART_GET_IN_OPS(AVR_UART_IN_OPS_DELAY)
+        AVR_UART_GET_SEQ_IN_OPS
+        );
+    } else if constexpr (delay % 3 == 2 && one_half_delay % 3 == 2 && one_half_delay_after_fst_bit % 3 == 0) {
+      asm volatile(
+        AVR_UART_GET_SEQ_ASM_TMPL(
+          AVR_UART_DELAY_2_CYCLE,
+          AVR_UART_DELAY_3_CYCLE,
+          AVR_UART_DELAY_2_CYCLE,
+          AVR_UART_DELAY_3_CYCLE_GET_SEQ,
+          "")
+        AVR_UART_GET_OUT_OPS(AVR_UART_OUT_OPS_DELAY)
+        AVR_UART_GET_SEQ_OUT_OPS
+        AVR_UART_GET_IN_OPS(AVR_UART_IN_OPS_DELAY)
+        AVR_UART_GET_SEQ_IN_OPS
+        );
+    } else if constexpr (delay % 3 == 2 && one_half_delay % 3 == 2 && one_half_delay_after_fst_bit % 3 == 1) {
+      asm volatile(
+        AVR_UART_GET_SEQ_ASM_TMPL(
+          AVR_UART_DELAY_2_CYCLE,
+          AVR_UART_DELAY_3_CYCLE,
+          AVR_UART_DELAY_2_CYCLE,
+          AVR_UART_DELAY_3_CYCLE_GET_SEQ,
+          AVR_UART_DELAY_1_CYCLE)
+        AVR_UART_GET_OUT_OPS(AVR_UART_OUT_OPS_DELAY)
+        AVR_UART_GET_SEQ_OUT_OPS
+        AVR_UART_GET_IN_OPS(AVR_UART_IN_OPS_DELAY)
+        AVR_UART_GET_SEQ_IN_OPS
+        );
+    } else if constexpr (delay % 3 == 2 && one_half_delay % 3 == 2 && one_half_delay_after_fst_bit % 3 == 2) {
+      asm volatile(
+        AVR_UART_GET_SEQ_ASM_TMPL(
+          AVR_UART_DELAY_2_CYCLE,
+          AVR_UART_DELAY_3_CYCLE,
+          AVR_UART_DELAY_2_CYCLE,
+          AVR_UART_DELAY_3_CYCLE_GET_SEQ,
+          AVR_UART_DELAY_2_CYCLE)
+        AVR_UART_GET_OUT_OPS(AVR_UART_OUT_OPS_DELAY)
+        AVR_UART_GET_SEQ_OUT_OPS
+        AVR_UART_GET_IN_OPS(AVR_UART_IN_OPS_DELAY)
+        AVR_UART_GET_SEQ_IN_OPS
+        );
+    } 
+    return buffer;
   }
 };
 

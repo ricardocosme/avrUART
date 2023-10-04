@@ -15,6 +15,9 @@ pc_rx_48bytes_tx_1byte:
 pc_rx_48bytes:
 	g++ -std=c++20 -O3 -o pc_rx_48bytes pc_rx_48bytes.cpp
 
+pc_read_seq:
+	g++ -std=c++20 -O3 -o pc_read_seq pc_read_seq.cpp
+
 %.s: %.cpp
 	$(CXX) $(CXXFLAGS) -S $^
 

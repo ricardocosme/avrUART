@@ -6,4 +6,5 @@ test/*.lst
 test/*.elf
 test/pc_rx_48bytes_tx_1byte
 test/pc_rx_48bytes
+test/pc_read_seq
 helper/clk-freq_baud-rate
