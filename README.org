@@ -1,23 +1,34 @@
 ** avrUART
 This is a compact code-size C++17 header-only implementation of a half-duplex software UART solution. It is designed to handle speeds greater than or equal to 8 CPU cycles per bit, which means, for example, 1 Mbps @ 8 MHz. The data frame configuration supported is 8-N-1, with 8 bits of data, no parity, and 1 stop bit. The implementation is based on the [[file:application_note/avr305.pdf][AVR305]] application note, and inline assembly is used to guarantee the precise time-sensitive code needed for implementing an UART software solution. The C++ layer is just a stub for the assembly implementation. The only dependency is [[https://github.com/ricardocosme/avrIO][avrIO]], which is used to receive the ~Tx~ and ~Rx~ pins as arguments, and the application program must be compiled with ~-Os~ optimization.
 
-*** Echo [demo]
+*** Echo [demo|fullcode]
 #+BEGIN_SRC C++
-  #include <avr/uart.hpp>
+#include <avr/uart.hpp>
 
-  using namespace avr::io;
-  using namespace avr::uart::literals;
+using namespace avr::io;
+using namespace avr::uart::literals;
 
-  int main() {
-    avr::uart::soft<Pb0/*tx*/, Pb1/*rx*/, 38400_bps, 1_MHz> uart;
-    while(true)
-      uart.put(uart.get());
-  }
+int main() {
+  avr::uart::soft<Pb0/*tx*/, Pb1/*rx*/, 38400_bps, 1_MHz> uart;
+  while(true)
+    uart.put(uart.get());
+}
 #+END_SRC
 
 Receives 1 byte through the ~Pb1~ pin (~Rx~) and echoes it through the ~Pb0~ pin (~Tx~). Transmission and reception operates at a baud rate of 38,400 bps, and the AVR is operating with a CPU frequency of 1 MHz.
 
 ~106 bytes @ ATtiny13A using avr-g++ 13.2.0 with -Os~
+
+*** Echo sequences of 10 bytes [demo]
+#+BEGIN_SRC C++
+while(true) {
+  /** Wait for a reception of 10 bytes. */
+  auto bytes = uart.get<10>();
+  
+  for(auto c : bytes)
+    uart.put(c);
+}
+#+END_SRC
 
 *** How to use it
 This is a header-only library, so nothing needs to be compiled:
