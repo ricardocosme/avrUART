@@ -170,10 +170,13 @@ struct soft {
 
      Note that this method is not appropriate to receive a sequence of
      bytes in a row because some CPU cycles (from application code)
-     will be consumed to handle each received byte, and this will
-     delay the reception in a way that can be unfeasible to operate
-     with a transmitter that sends a sequence without extra time
-     between each sent byte.
+     will be consumed to handle each received byte. The sender can
+     start transmitting the next byte before the receiver is waiting
+     for its start bit. The sender can be faster than the receiver,
+     outside the time-sensitive zone. In other words, the
+     synchronization between the transmitter and receiver occurs for
+     each byte, and between two bytes, the sender can begin sending
+     before the receiver waits for the next start bit.
   */
   uint8_t get() const {    
     /** loop instructions executed in 6 cycles */

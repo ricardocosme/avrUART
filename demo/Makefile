@@ -9,7 +9,7 @@ OBJDUMP=avr-objdump
 INCLUDE=-I../include -I$(AVR_IO_INCLUDE) 
 CXXFLAGS=-std=c++17 -mmcu=$(MCU) -Wall -Os $(INCLUDE)  -Wno-array-bounds
 
-all: echo.lst
+all: echo.lst echo_seq.lst
 
 %.s: %.cpp
 	$(CXX) $(CXXFLAGS) -S $^
