@@ -28,11 +28,39 @@ inline namespace literals {
   constexpr uint32_t operator""_Hz(unsigned long long v) { return v; }
   constexpr uint32_t operator""_kHz(unsigned long long v) { return v * 1e3; }
   constexpr uint32_t operator""_MHz(unsigned long long v) { return v * 1e6; }
+
+  constexpr uint8_t operator""_cycles_ago(unsigned long long v) { return v; }
 }//namespace literals
 
 /** CPU required cycles to handle transmission or reception of 1 bit. */
 constexpr auto bit_length_cycles(uint32_t clk, uint32_t baud_rate)
 { return clk * 1.0/baud_rate; }
+
+/** buffer to store N received bytes
+
+    This abstraction is used by get<N>() to return the received
+    bytes.
+ */
+template<uint8_t N>
+class buffer_t {
+  uint8_t _data[N];
+public:
+  static constexpr uint8_t size{N};
+  
+  using iterator = uint8_t*;
+  using const_iterator = const uint8_t*;
+
+  iterator begin() { return _data; }
+  const_iterator begin() const { return _data; }
+  const_iterator cbegin() const { return _data; }
+  iterator end() { return _data + size; }
+  const_iterator end() const { return _data + size; }
+  const_iterator cend() const { return _data + size; }
+  uint8_t& operator[](uint8_t i) { return _data[i]; }
+  const uint8_t& operator[](uint8_t i) const { return _data[i]; }
+  uint8_t* data() { return _data; }
+  const uint8_t* data() const { return _data; }
+};
 
 /**
    Represents a virtual UART device that uses software to transmit and
@@ -177,7 +205,20 @@ struct soft {
      synchronization between the transmitter and receiver occurs for
      each byte, and between two bytes, the sender can begin sending
      before the receiver waits for the next start bit.
+
+     [advanced]
+      
+     start_bit_started_at: number of CPU cycles executed since the
+     start bit is on the line. This parameter is useful when an async
+     read is implemented in the application code. One approach it to
+     read the bytes when the Rx pin transitions to the zero level,
+     indicating the start bit. However, there may be some CPU cycles
+     executed before the MCU reaches get_bytes(). Therefore, the
+     implementation must take into account the duration of the start
+     bit on the line in order to calculate the necessary delay for
+     consuming the start bit and sync the receiver to read the data.
   */
+  template<uint8_t start_bit_started_at = 0_cycles_ago>
   uint8_t get() const {    
     /** loop instructions executed in 6 cycles */
     constexpr auto delay{cycles_required - 6};
@@ -185,7 +226,7 @@ struct soft {
     /** 4(or 3) cycles of instructions before reaching the point of
      * reading the bit. */
     constexpr auto one_half_delay
-      {detail::math::round(1.5 * bit_length_cycles(clk, bitrate) - 4)};
+      {detail::math::round(1.5 * bit_length_cycles(clk, bitrate) - 4 - start_bit_started_at)};
 
     uint8_t byte{0}, bits, one_half_delay_cnt,
       one_half_delay_b{one_half_delay / 3};
@@ -281,32 +322,6 @@ struct soft {
     return byte;
   }
 
-  /** buffer to store N received bytes
-
-      This abstraction is used by get<N>() to return the received
-      bytes.
-   */
-  template<uint8_t N>
-  class buffer_t {
-    uint8_t _data[N];
-  public:
-    static constexpr uint8_t size{N};
-    
-    using iterator = uint8_t*;
-    using const_iterator = const uint8_t*;
-
-    iterator begin() { return _data; }
-    const_iterator begin() const { return _data; }
-    const_iterator cbegin() const { return _data; }
-    iterator end() { return _data + size; }
-    const_iterator end() const { return _data + size; }
-    const_iterator cend() const { return _data + size; }
-    uint8_t& operator[](uint8_t i) { return _data[i]; }
-    const uint8_t& operator[](uint8_t i) const { return _data[i]; }
-    uint8_t* data() { return _data; }
-    const uint8_t* data() const { return _data; }
-  };
-
   /** Receive and return N bytes from Rx. This is a blocking call.
 
       Note: this methods can't handle the high speeds handled by the
@@ -314,9 +329,21 @@ struct soft {
       using get() but with this version we can only handle
       communication using 16 CPU cycles as a bit time, so it's for
       example 500 kbps @ 8 MHz.
+
+      [advanced]
+      
+      start_bit_started_at: number of CPU cycles executed since the
+      start bit is on the line. This parameter is useful when an async
+      read is implemented in the application code. One approach it to
+      read the bytes when the Rx pin transitions to the zero level,
+      indicating the start bit. However, there may be some CPU cycles
+      executed before the MCU reaches get_bytes(). Therefore, the
+      implementation must take into account the duration of the start
+      bit on the line in order to calculate the necessary delay for
+      consuming the start bit and sync the receiver to read the data.
    */
-  template<uint8_t N>
-  auto get() const {    
+  template<uint8_t N, uint8_t start_bit_started_at = 0_cycles_ago>
+  auto get_bytes() const {    
     static_assert(cycles_required >= 16,
                   "the bit length in cycles must be greater or equal to 16. "\
                   "[clk_frequency/baud_rate >= 16]");
@@ -331,7 +358,7 @@ struct soft {
     /** 4(or 3) cycles of instructions before reaching the point of
      * reading the bit. */
     constexpr auto one_half_delay
-      {detail::math::round(1.5 * bit_length_cycles(clk, bitrate) - 4)};
+      {detail::math::round(1.5 * bit_length_cycles(clk, bitrate) - 4 - start_bit_started_at)};
 
     constexpr auto one_half_delay_after_fst_bit
       {detail::math::round(1.5 * bit_length_cycles(clk, bitrate) - 10)};
