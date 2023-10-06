@@ -73,9 +73,9 @@ Tested with the following pairs of baud rate and CPU clock frequency using ATtin
 *** ToDo
 - [X] Implement a set of methods to read sequences of bytes.
 - [X] Implement an asynchronous read solution. [*]
-- [ ] +Increase the upper limit of CPU cycles supported. The current implementation only supports ~513 cycles~.+ (I don't need this for my projects, but if someone is interested, I ask them to open an issue here)
+- [ ] +Increase the upper limit of CPU cycles supported. The current implementation only supports ~513 cycles~.+ /(I don't need this for my projects, but if someone is interested, I ask them to open an issue here)/
 
-[*] I don't see a safe and general approach to support async readings in a bit-banged UART solution. Instead, I prefer to offer a demo showcasting an approach used in one of my projects, and a parameterization of `get`,`get_bytes` to utilize them only when a start bit is already present on the line before making the `get` call.
+[*] I don't see a safe and general approach to support async readings in a bit-banged UART solution. Instead, I prefer to offer a demo showcasting an approach used in one of my projects, and a parameterization of ~get~,~get_bytes~ to utilize them only when a start bit is already present on the line before making the ~get~ call.
 
 *** License
 avrUART is released under [[file:LICENSE][MIT License]].
