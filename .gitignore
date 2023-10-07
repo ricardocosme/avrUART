@@ -1,6 +1,12 @@
 demo/*.s
 demo/*.lst
 demo/*.elf
+demo/*/*.s
+demo/*/*.lst
+demo/*/*.elf
+demo/*/*/*.s
+demo/*/*/*.lst
+demo/*/*/*.elf
 test/*.s
 test/*.lst
 test/*.elf

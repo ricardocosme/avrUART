@@ -6,10 +6,10 @@ AVR_IO_INCLUDE=$(HOME)/avrIO/include
 CXX=avr-g++
 OBJCOPY=avr-objcopy
 OBJDUMP=avr-objdump
-INCLUDE=-I../include -I$(AVR_IO_INCLUDE) -I../../avrSLEEP/include -I../../avrWDT/include -I../../avrINT/include
+INCLUDE=-I../../../include -I$(AVR_IO_INCLUDE) -I$(HOME)/avrSLEEP/include -I$(HOME)/avrWDT/include -I$(HOME)/avrINT/include
 CXXFLAGS=-std=c++17 -mmcu=$(MCU) -Wall -Os $(INCLUDE)  -Wno-array-bounds
 
-all: echo.lst echo_seq.lst interrupts/slave_power_down.lst
+all: slave_pulse.lst master_pulse.lst
 
 %.s: %.cpp
 	$(CXX) $(CXXFLAGS) -S $^

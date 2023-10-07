@@ -10,6 +10,11 @@ using namespace avr::uart;
    Wake-up the MCU from power down to handle one command sent through
    UART.
 
+   This is a valid approach for devices that are act as slaves,
+   performing work to respond with results requested by commands. For
+   example, it's suitable for units that are collect data from sensors
+   to send it to a requester (master).
+
    Warning: this approach is just one of several alternatives. It
    doesn't require an exclusive line (pin) for flow control or
    handshake, but it can be tricky because the time after sending the
