@@ -2,14 +2,17 @@ MCU:=attiny13a
 DEV:=t13
 
 AVR_IO_INCLUDE=$(HOME)/avrIO/include
+AVR_SLEEP_INCLUDE=$(HOME)/avrSLEEP/include
+AVR_WDT_INCLUDE=$(HOME)/avrWDT/include
+AVR_INT_INCLUDE=$(HOME)/avrINT/include
 
 CXX=avr-g++
 OBJCOPY=avr-objcopy
 OBJDUMP=avr-objdump
-INCLUDE=-I../../../include -I$(AVR_IO_INCLUDE) -I$(HOME)/avrSLEEP/include -I$(HOME)/avrWDT/include -I$(HOME)/avrINT/include
+INCLUDE=-I../../include -I$(AVR_IO_INCLUDE) -I$(AVR_SLEEP_INCLUDE) -I$(AVR_WDT_INCLUDE) -I$(AVR_INT_INCLUDE)
 CXXFLAGS=-std=c++17 -mmcu=$(MCU) -Wall -Os $(INCLUDE)  -Wno-array-bounds
 
-all: slave_pulse.lst master_pulse.lst
+all: slave.lst master.lst
 
 %.s: %.cpp
 	$(CXX) $(CXXFLAGS) -S $^

@@ -18,9 +18,6 @@ pc_rx_48bytes:
 pc_read_seq:
 	g++ -std=c++20 -O3 -o pc_read_seq pc_read_seq.cpp
 
-pc_pcint_1byte:
-	g++ -std=c++20 -O3 -o pc_pcint_1byte pc_pcint_1byte.cpp
-
 %.s: %.cpp
 	$(CXX) $(CXXFLAGS) -S $^
 

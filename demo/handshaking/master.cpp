@@ -1,9 +1,6 @@
 #include <avr/uart.hpp>
 #include <avr/sleep.hpp>
-#define F_CPU 1000000
-#include <util/delay.h>
 
-using namespace avr::interrupt;
 using namespace avr::io;
 using namespace avr::sleep;
 using namespace avr::uart;
@@ -11,21 +8,22 @@ using namespace avr::uart;
 using Tx = Pb0;
 using Rx = Pb1;
 
+AVRINT_WDT() {}
+
 int main() {
-  osccal = 0x9d;
+  osccal = 0x9a;
+  constexpr auto baud_rate = 57600_bps;
+  constexpr auto clk = 8_MHz;
   
-  avr::uart::soft<Tx, Rx, 38400_bps, 1_MHz> uart;
-  avr::uart::soft<Pb4, Pb3, 38400_bps, 1_MHz> term;
+  avr::uart::soft<Tx, Rx, baud_rate, clk> uart;
+  avr::uart::soft<Pb4, Pb3, baud_rate, clk> term;
   
   while(true) {
-    _delay_ms(500);
+    power_down::sleep_for<500_ms>();
 
-    //send a request to send data
-    Tx::low();
-    while(Rx::is_high());
-    Tx::high();
-    _delay_us(5);
-
+    //handshaking
+    uart.request_to_send();
+    
     //send the command
     uart.put(0x4e);
 

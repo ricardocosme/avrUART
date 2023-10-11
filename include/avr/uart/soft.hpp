@@ -28,8 +28,6 @@ inline namespace literals {
   constexpr uint32_t operator""_Hz(unsigned long long v) { return v; }
   constexpr uint32_t operator""_kHz(unsigned long long v) { return v * 1e3; }
   constexpr uint32_t operator""_MHz(unsigned long long v) { return v * 1e6; }
-
-  constexpr uint8_t operator""_cycles_ago(unsigned long long v) { return v; }
 }//namespace literals
 
 /** CPU required cycles to handle transmission or reception of 1 bit. */
@@ -205,20 +203,7 @@ struct soft {
      synchronization between the transmitter and receiver occurs for
      each byte, and between two bytes, the sender can begin sending
      before the receiver waits for the next start bit.
-
-     [advanced]
-      
-     start_bit_started_at: number of CPU cycles executed since the
-     start bit is on the line. This parameter is useful when an async
-     read is implemented in the application code. One approach it to
-     read the bytes when the Rx pin transitions to the zero level,
-     indicating the start bit. However, there may be some CPU cycles
-     executed before the MCU reaches get_bytes(). Therefore, the
-     implementation must take into account the duration of the start
-     bit on the line in order to calculate the necessary delay for
-     consuming the start bit and sync the receiver to read the data.
   */
-  template<uint8_t start_bit_started_at = 0_cycles_ago>
   uint8_t get() const {    
     /** loop instructions executed in 6 cycles */
     constexpr auto delay{cycles_required - 6};
@@ -226,7 +211,7 @@ struct soft {
     /** 4(or 3) cycles of instructions before reaching the point of
      * reading the bit. */
     constexpr auto one_half_delay
-      {detail::math::round(1.5 * bit_length_cycles(clk, bitrate) - 4 - start_bit_started_at)};
+      {detail::math::round(1.5 * bit_length_cycles(clk, bitrate) - 4)};
 
     uint8_t byte{0}, bits, one_half_delay_cnt,
       one_half_delay_b{one_half_delay / 3};
@@ -329,20 +314,8 @@ struct soft {
       using get() but with this version we can only handle
       communication using 16 CPU cycles as a bit time, so it's for
       example 500 kbps @ 8 MHz.
-
-      [advanced]
-      
-      start_bit_started_at: number of CPU cycles executed since the
-      start bit is on the line. This parameter is useful when an async
-      read is implemented in the application code. One approach it to
-      read the bytes when the Rx pin transitions to the zero level,
-      indicating the start bit. However, there may be some CPU cycles
-      executed before the MCU reaches get_bytes(). Therefore, the
-      implementation must take into account the duration of the start
-      bit on the line in order to calculate the necessary delay for
-      consuming the start bit and sync the receiver to read the data.
    */
-  template<uint8_t N, uint8_t start_bit_started_at = 0_cycles_ago>
+  template<uint8_t N>
   auto get_bytes() const {    
     static_assert(cycles_required >= 16,
                   "the bit length in cycles must be greater or equal to 16. "\
@@ -358,7 +331,7 @@ struct soft {
     /** 4(or 3) cycles of instructions before reaching the point of
      * reading the bit. */
     constexpr auto one_half_delay
-      {detail::math::round(1.5 * bit_length_cycles(clk, bitrate) - 4 - start_bit_started_at)};
+      {detail::math::round(1.5 * bit_length_cycles(clk, bitrate) - 4)};
 
     constexpr auto one_half_delay_after_fst_bit
       {detail::math::round(1.5 * bit_length_cycles(clk, bitrate) - 10)};
@@ -721,6 +694,53 @@ struct soft {
         );
     } 
     return buffer;
+  }
+
+  /** [optional] This is a handshaking method that utilizes the Tx/Rx
+      lines to ensure that the receiver can receive the data sent by
+      the trasmitter. This method is used by the transmitter , and
+      immediately after it, a put() call must be made.
+
+      It can be used to implement an async read using interrupts.
+      
+      Note: this handshaking will not work with a vanilla UART
+      device. This is an approach to be used with another device that
+      can follow the handshaking.
+  */
+  [[gnu::always_inline]] inline void request_to_send() const {
+    asm volatile(
+    R"(
+      cbi  %[portx], %[tx_pin]
+    1:sbic %[pinx], %[rx_pin]
+      rjmp 1b
+      sbi  %[portx], %[tx_pin]
+    )"
+    :
+    : [portx]  "I" (TxPin::portx::io_addr()),
+      [pinx]   "I" (RxPin::pinx::io_addr()),
+      [tx_pin] "I" (TxPin::value),
+      [rx_pin] "I" (RxPin::value)
+    );
+    constexpr auto delay = detail::math::round(14e-6 / (1.0/clk) - 1);
+    static_assert(delay <= 255);
+    __builtin_avr_delay_cycles(delay);
+  }
+
+  /** [optional] This is a handshaking method that utilizes the Tx/Rx
+      lines to ensure that the receiver can receive the data sent by
+      the trasmitter. This method is used by the receiver , and
+      immediately after it, a get() call must be made.
+
+      It can be used to implement an async read using interrupts.
+      
+      Note: this handshaking will not work with a vanilla UART
+      device. This is an approach to be used with another device that
+      can follow the handshaking.
+  */
+  [[gnu::always_inline]] inline void clear_to_send() const {
+    TxPin::low();
+    while(RxPin::is_low());
+    TxPin::high();
   }
 };
 
