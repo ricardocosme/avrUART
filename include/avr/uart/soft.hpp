@@ -4,6 +4,9 @@
 #include "avr/uart/detail/inline_asm.hpp"
 
 #include <avr/io.hpp>
+#if __has_include(<avr/interrupt.hpp>)
+#include <avr/interrupt.hpp>
+#endif
 #include <stdint.h>
 
 namespace avr::uart {
@@ -743,6 +746,36 @@ struct soft {
     while(RxPin::is_low());
     TxPin::high();
   }
+
+#if __has_include(<avr/interrupt.hpp>) //dependency: avrINT
+  /** [optional] This is a pattern to handle a byte that is coming
+      when using interrupts to read async.
+
+      flag: pointer to a bool that serves as a flag indicating if data
+      is coming.
+
+      cbk: a callback that doesn't return anything and receives a
+      reference to the UART instance.
+
+      Example:
+        while(true) { //event loop
+          //other stuff
+          when_byte_comes(&data_coming, [&](auto& uart, auto byte) {
+            //do something with byte
+          });
+        }
+  */
+  template<typename Flag, typename Callback>
+  [[gnu::always_inline]] inline void when_byte_comes(Flag* flag, Callback cbk) {
+    if(*flag) {
+      interrupt::atomic scope;
+      *flag = false;
+      clear_to_send();
+      auto byte = get();
+      cbk(*this, byte);
+    }
+  }
+#endif
 };
 
 } //namespace avr::uart
