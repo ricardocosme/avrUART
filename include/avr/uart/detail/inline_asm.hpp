@@ -1,7 +1,7 @@
 #pragma once
 
 #define AVR_UART_PUT_ASM_TMPL(delay,delay_rest)     \
-  "  in  %[port_state], %[pinx]        \n\t"        \
+  "  in  %[port_state], %[portx]        \n\t"        \
   "  com %[byte]                       \n\t"        \
   "  ldi %[bits],       10             \n\t"        \
   "1:cbr %[port_state], %[mask]        \n\t"        \
@@ -23,7 +23,6 @@
   
 #define AVR_UART_PUT_IN_OPS(delay)                                \
   : [portx] "I" (TxPin::portx::io_addr()),                        \
-    [pinx] "I" (TxPin::pinx::io_addr()),                          \
     [mask] "i" (TxPin::bv())                                      \
     delay
     
