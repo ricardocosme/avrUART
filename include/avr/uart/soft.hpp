@@ -749,7 +749,7 @@ struct soft {
 
 #if __has_include(<avr/interrupt.hpp>) //dependency: avrINT
   /** [optional] This is a pattern to handle a byte that is coming
-      when using interrupts to read async.
+      when using interrupts for asynchronous reading.
 
       flag: pointer to a bool that serves as a flag indicating if data
       is coming.
