@@ -738,6 +738,7 @@ struct soft {
       can follow the handshaking.
   */
   [[gnu::always_inline]] inline void clear_to_send() const {
+    while(RxPin::is_high());
     TxPin::low();
     while(RxPin::is_low());
     TxPin::high();
